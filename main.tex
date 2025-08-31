@@ -5,7 +5,7 @@
 %\usepackage{basetitle}
 
 \title{Soutenance de stage - On Demand Buffer}
-\author[Brelot]{Julien Brelot}
+\author[Brelot]{Brelot}
 \date{ 03 mars — 28 juillet 2025}
 
 % Logos côte à côte sur la page de titre
@@ -33,15 +33,20 @@
 
 \begin{frame}[plain]
     \centering
-    {\Huge Soutenance de stage - On Demand Buffer\par}
+    {\Huge Soutenance de stage\par}
+    {\huge Diplôme d’ingénieur Telecom Physique Strasbourg\par}
+    {\Large Spécialité Informatique et Réseaux\par}
+    {\Large Option Réseaux et Internet des Objets\par}
     \vspace{0.5cm}
-    {\large Julien Brelot\par}
-    \vspace{0.5cm}
-    {\large 03 mars — 28 juillet 2025\par}
+    {\large 03 mars — 28 juillet 2025 \par}
+    {\large Laboratoire d’Informatique de Grenoble (LIG)\par}
+    {\large On Demand Buffer (ODB)\par}
+    \vspace{1cm}
+    {\Large Brelot Julien\par}
     \vspace{1cm}
         \centering
         \includegraphics[width=0.45\textwidth]{img2/logo-tps.png}
-        \\
+        %\\
         \includegraphics[width=0.45\textwidth]{img2/imt.png}
 \end{frame}
 
@@ -153,59 +158,72 @@ KrakOS bénéficie d’un environnement scientifique riche, avec des collaborati
 
 \section{Intégration dans une application existante}
 \begin{frame}{Intégration dans une application existante}
-\begin{itemize}
-    \item \textbf{Objectif d'ODB} : fonctionner avec une application web existante sans modifier le code source.
-    \item Contraintes clés :
+\begin{card}
     \begin{itemize}
-        \item Ne pas perturber les communications existantes (HTTP, FTP, SMTP…).
-        \item Envoyer et recevoir des données, sans bloquer l'application.
-        \item Séparer les données ODB des buffers de l'application.
-        \item Gérer les erreurs ODB sans impacter l'application.
+        \item \textbf{Objectif d'ODB} : fonctionner avec une application web existante sans modifier le code source.
+        \item Contraintes clés :
+        \begin{itemize}
+            \item Ne pas perturber les communications existantes (HTTP, FTP, SMTP…).
+            \item Envoyer et recevoir des données, sans bloquer l'application.
+            \item Séparer les données ODB des buffers de l'application.
+            \item Gérer les erreurs ODB sans impacter l'application.
+        \end{itemize}
+        \item Nécessité de \textbf{sockets connectées et séquentielles} (TCP) pour garantir la cohérence des échanges.
     \end{itemize}
-    \item Nécessité de \textbf{sockets connectées et séquentielles} (TCP) pour garantir la cohérence des échanges.
-\end{itemize}
+\end{card}
 \end{frame}
 
 \section{Alignement des données}
 
 \begin{frame}{Alignement des données}
-\begin{itemize}
-    \item ODB utilise \texttt{mprotect()} pour protéger l'accès aux données.
-    \item \textbf{Contraintes de mprotect} :
+\begin{card}
     \begin{itemize}
-        \item Protection à la granularité d'une page.
-        \item Mémoire alignée sur les frontières de pages.
+        \item ODB utilise \texttt{mprotect()} pour protéger l'accès aux données.
+        \item \textbf{Contraintes de mprotect} :
+        \begin{itemize}
+            \item Protection à la granularité d'une page.
+            \item Mémoire alignée sur les frontières de pages.
+        \end{itemize}
+        \item Buffers non-alignés :
+        \begin{itemize}
+            \item \textbf{Head} : début non aligné (< page)
+            \item \textbf{Body} : zone alignée et multiple d'une page
+            \item \textbf{Tail} : fin non alignée (< page)
+        \end{itemize}
+        \item Données Head/Tail doivent être transférées "réellement", Body peut rester virtualisé.
     \end{itemize}
-    \item Buffers non-alignés :
-    \begin{itemize}
-        \item \textbf{Head} : début non aligné (< page)
-        \item \textbf{Body} : zone alignée et multiple d'une page
-        \item \textbf{Tail} : fin non alignée (< page)
-    \end{itemize}
-    \item Données Head/Tail doivent être transférées "réellement", Body peut rester virtualisé.
-\end{itemize}
-\begin{figure}
-    \centering
-    \includegraphics[scale=0.4]{img2/memory_pb.png}
-    \caption{Zones mémoire Head / Body / Tail}
-\end{figure}
+\end{card}
+\end{frame}
+
+\begin{frame}{Alignement des données : Illustration}
+    \begin{figure}
+        \centering
+        \includegraphics[scale=0.4]{img2/memory_pb.png}
+        \caption{Zones mémoire Head / Body / Tail}
+    \end{figure}
 \end{frame}
 
 \section{Protocole d'encapsulation}
 \begin{frame}{Protocole d'encapsulation}
-\begin{itemize}
-    \item Besoin : garantir la cohérence et la compatibilité avec POSIX malgré les non-alignements.
-    \item Solution : \textbf{protocole d'encapsulation ODB} 
+\begin{card}
     \begin{itemize}
-        \item En-tête \texttt{ODB\_Header} : type de données (réelles ou virtuelles)
-        \item Pour les données virtuelles : \texttt{ODB\_Desc} décrit Body/Head/Tail et back-end
-        \item Interception des appels système pour ajouter/extraire ces informations au niveau applicatif
+        \item Besoin : garantir la cohérence et la compatibilité avec POSIX malgré les non-alignements.
+        \item Solution : \textbf{protocole d'encapsulation ODB} 
+        \begin{itemize}
+            \item En-tête \texttt{ODB\_Header} : type de données (réelles ou virtuelles)
+            \item Pour les données virtuelles : \texttt{ODB\_Desc} décrit Body/Head/Tail et back-end
+            \item Interception des appels système pour ajouter/extraire ces informations au niveau applicatif
+        \end{itemize}
+        \item Nécessité de sockets séquentielles pour traiter les en-têtes ODB avant les données applicatives.
     \end{itemize}
-    \item Nécessité de sockets séquentielles pour traiter les en-têtes ODB avant les données applicatives.
-\end{itemize}
+\end{card}
+
+\end{frame}
+
+\begin{frame}{Protocole d'encapsulation : Illustration}
 \begin{figure}
     \centering
-    \includegraphics[scale=0.3]{img2/odb_communication.png}
+    \includegraphics[width=\textwidth]{img2/odb_communication.png}
     \caption{Communication et encapsulation ODB}
 \end{figure}
 \end{frame}
@@ -213,127 +231,152 @@ KrakOS bénéficie d’un environnement scientifique riche, avec des collaborati
 
 \section{Messages ODB et flux de données}
 \begin{frame}{Messages ODB et flux de données}
-\begin{itemize}
-    \item Messages ODB contiennent :
+\begin{card}
+    
     \begin{itemize}
-        \item Identifiant virtuel de la page, IP/port back-end
-        \item Tailles des zones Head, Body, Tail
+        \item Messages ODB contiennent :
+        \begin{itemize}
+            \item Identifiant virtuel de la page, IP/port back-end
+            \item Tailles des zones Head, Body, Tail
+        \end{itemize}
+        \item Données virtualisées vs données réelles :
+        \begin{itemize}
+            \item Head/Tail : transférées effectivement
+            \item Body : virtualisé, transfert à la demande
+        \end{itemize}
+        \item Objectif : transparence totale pour l'application, cohérence des échanges garantie.
     \end{itemize}
-    \item Données virtualisées vs données réelles :
-    \begin{itemize}
-        \item Head/Tail : transférées effectivement
-        \item Body : virtualisé, transfert à la demande
-    \end{itemize}
-    \item Objectif : transparence totale pour l'application, cohérence des échanges garantie.
-\end{itemize}
-\begin{figure}
-    \centering
-    \includegraphics[scale=0.3]{img2/odb_c_messages.jpg}
-    \caption{Détail des messages ODB}
-\end{figure}
+\end{card}
+\end{frame}
+
+\begin{frame}{Messages ODB et flux de données : Illustration}
+    \begin{figure}
+        \centering
+        \includegraphics[width=\textwidth]{img2/odb_c_messages.jpg}
+        \caption{Détail des messages ODB}
+    \end{figure}
 \end{frame}
 
 
 \part{Réalisation Technique}
 \section{Utilisation du protocole ODB}
 \begin{frame}{Utilisation du protocole ODB}
-\begin{itemize}
-    \item ODB nécessite que \textbf{les deux applications} utilisent le protocole pour garantir la cohérence des échanges.
-    \item Deux approches pour gérer l’activation d’ODB :
-    \begin{enumerate}
-        \item Fichier de configuration : indique les ports où ODB est actif.
-        \item Mode \emph{stand-alone} : détection automatique via un \emph{magic number} + CRC-8.
-    \end{enumerate}
-    \item Objectif : permettre au front-end de communiquer correctement avec le back-end ODB tout en restant compatible avec des clients classiques.
-\end{itemize}
+\begin{card}
+    \begin{itemize}
+        \item ODB nécessite que \textbf{les deux applications} utilisent le protocole pour garantir la cohérence des échanges.
+        \item Deux approches pour gérer l’activation d’ODB :
+        \begin{enumerate}
+            \item Fichier de configuration : indique les ports où ODB est actif.
+            \item Mode \emph{stand-alone} : détection automatique via un \emph{magic number} + CRC-8.
+        \end{enumerate}
+        \item Objectif : permettre au front-end de communiquer correctement avec le back-end ODB tout en restant compatible avec des clients classiques.
+    \end{itemize}
+    \end{card}
 \end{frame}
 
 \section{Gestion des buffers non-alignés}
 \begin{frame}{Gestion des buffers non-alignés}
-\begin{itemize}
-    \item Head/Tail : parties non-alignées, transmises en données réelles.
-    \item Body : zone alignée, peut rester virtualisée.
-    \item Stratégies d’envoi :
+\begin{card}
     \begin{itemize}
-        \item \textbf{Statique} : taille fixe (\emph{unaligned\_size}), simple mais limite l’hétérogénéité.
-        \item \textbf{Dynamique} : taille variable, téléchargement à la demande depuis le BE.
-        \item \textbf{Anticipation} : hybride, BE envoie Head/Tail vers le IS suivant pour réduire les requêtes.
+        \item Head/Tail : parties non-alignées, transmises en données réelles.
+        \item Body : zone alignée, peut rester virtualisée.
+        \item Stratégies d’envoi :
+        \begin{itemize}
+            \item \textbf{Statique} : taille fixe (\emph{unaligned\_size}), simple, mauvaise gestion de l’hétérogénéité des serveurs.
+            \item \textbf{Dynamique} : taille variable, téléchargement à la demande depuis le BE.
+            \item \textbf{Anticipation} : hybride, BE envoie Head/Tail vers le IS suivant pour réduire les requêtes.
+        \end{itemize}
+        \item Gestion des buffers de réception insuffisants : téléchargement segmenté Head/Body/Tail et maintien de l’état de réception.
     \end{itemize}
-    \item Gestion des buffers de réception insuffisants : téléchargement segmenté Head/Body/Tail et maintien de l’état de réception.
-\end{itemize}
-\begin{figure}
-    \centering
-    \includegraphics[width=0.7\textwidth]{img/odb_adaptative_memory.png}
-    \caption{Stratégie d'anticipation pour buffers non-alignés}
-\end{figure}
+\end{card}
+\end{frame}
+
+\begin{frame}{Gestion des buffers non-alignés : Illustration}
+    \begin{figure}
+        %\centering
+        \includegraphics[width=\paperwidth]{img2/odb_adaptative_memory.png}
+        \caption{Stratégie d'anticipation pour buffers non-alignés}
+    \end{figure}
 \end{frame}
 
 \section{Développement de serveurs tests}
 \begin{frame}{Développement de serveurs tests}
-\begin{itemize}
-    \item Objectif : tester et déboguer ODB.
-    \item Composants :
+\begin{card}
     \begin{itemize}
-        \item FE : envoie des requêtes et reçoit des fichiers.
-        \item IS : transfère les données entre BE et FE.
-        \item BE : lit le fichier et envoie les données au FE via les IS.
+        \item Objectif : tester et déboguer ODB.
+        \item Composants :
+        \begin{itemize}
+            \item FE : envoie des requêtes et reçoit des fichiers.
+            \item IS : transfère les données entre BE et FE.
+            \item BE : lit le fichier et envoie les données au FE via les IS.
+        \end{itemize}
+        \item Paramétrable via flags pour tester différentes tailles de buffers.
+        \item Application cible pour tests réels : \textbf{nginx}, serveur web/ reverse-proxy majoritairement utilisé.
     \end{itemize}
-    \item Paramétrable via flags pour tester différentes tailles de buffers.
-    \item Application cible pour tests réels : \textbf{nginx}, serveur web/ reverse-proxy majoritairement utilisé.
-\end{itemize}
+\end{card}
 \end{frame}
 
 \section{Utilisation avec Nginx}
 \begin{frame}{Utilisation avec Nginx}
-\begin{itemize}
-    \item Nginx utilise plusieurs processus :
+\begin{card}
     \begin{itemize}
-        \item Master : gestion configuration et processus
-        \item Cache Loader / Manager : gestion mémoire cache
-        \item Worker : boucle événementielle pour traiter les connexions
+        \item Nginx utilise plusieurs processus :
+        \begin{itemize}
+            \item Master : gestion configuration et processus
+            \item Cache Loader / Manager : gestion mémoire cache
+            \item Worker : boucle événementielle pour traiter les connexions
+        \end{itemize}
+        \item Boucle d’événements :
+        \begin{itemize}
+            \item Surveillance des descripteurs (epoll/poll/kqueue)
+            \item Traitement séquentiel des événements
+            \item Sockets non-bloquantes nécessaires
+        \end{itemize}
+        \item Thread pools pour gérer I/O lourdes sans bloquer les workers.
     \end{itemize}
-    \item Boucle d’événements :
-    \begin{itemize}
-        \item Surveillance des descripteurs (epoll/poll/kqueue)
-        \item Traitement séquentiel des événements
-        \item Sockets non-bloquantes nécessaires
-    \end{itemize}
-    \item Thread pools pour gérer I/O lourdes sans bloquer les workers.
-\end{itemize}
-\begin{figure}
-    \centering
-    \includegraphics[width=0.6\textwidth]{img2/nginx-event-Loop.png}
-    \caption{Boucle événementielle des workers Nginx}
-\end{figure}
+\end {card}
 \end{frame}
 
-\begin{frame}{Problème avec epoll Edge Triggered (5/5)}
-\begin{itemize}
-    \item Mode Edge Triggered : notification seulement lors du changement d’état de la socket.
-    \item Problème : ODB virtualise les données, Nginx peut ne pas lire tout le buffer restant.
-    \item Solutions envisagées :
-    \begin{enumerate}
-        \item Vérifier après chaque \textit{recv} et forcer un événement EPOLLIN si nécessaire.
-        \item Intercepter \textit{epoll\_create} et \textit{epoll\_ctl} pour passer en mode Level Triggered.
-    \end{enumerate}
-    \item Conséquence : complexité accrue et risque de latence supplémentaire sur la boucle événementielle.
-    \item Conclusion : intégration ODB dans Nginx nécessite de gérer finement la lecture/écriture sur sockets pour éviter les pertes de données.
-\end{itemize}
+\begin{frame}{Utilisation avec Nginx : Illustration}
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.6\textwidth]{img2/nginx-event-Loop.png}
+        \caption{Boucle événementielle des workers Nginx}
+    \end{figure}
+\end{frame}
+
+\section{Problème avec epoll Edge Triggered}
+\begin{frame}{Problème avec epoll Edge Triggered}
+\begin{card}
+    \begin{itemize}
+        \item Mode Edge Triggered : notification seulement lors du changement d’état de la socket.
+        \item Problème : ODB virtualise les données, Nginx peut ne pas lire tout le buffer restant.
+        \item Solutions envisagées :
+        \begin{enumerate}
+            \item Vérifier après chaque \textit{recv} et forcer un événement EPOLLIN si nécessaire.
+            \item Intercepter \textit{epoll\_create} et \textit{epoll\_ctl} pour passer en mode Level Triggered.
+        \end{enumerate}
+        \item Conséquence : complexité accrue et risque de latence supplémentaire sur la boucle événementielle.
+        \item Conclusion : intégration ODB dans Nginx nécessite de gérer finement la lecture/écriture sur sockets pour éviter les pertes de données.
+    \end{itemize}
+\end{card}
 \end{frame}
 
 
 \section{Résultats et analyse}
 
 \begin{frame}{Tests menés}
-\begin{itemize}
-    \item 3 serveurs Nginx sur 3 nœuds Grid5000, 1 worker par serveur, 1 cœur logique.
-    \item Front-end et serveur intermédiaire : 2 proxies ; back-end : serveur HTTP.
-    \item Proxy buffering désactivé.
-    \item Charge : 50 clients/s jusqu'à 1000 clients, ~30k requêtes GET.
-    \item Payloads virtuelles : \{16, 32, 64, 128, 256 Ko\}.
-    \item Métriques : CPU total, CPU sur cœur du worker, mémoire, latence et débit.
-    \item Variables : alignement des buffers, stratégie ODB (\textit{dynamic} vs \textit{anticipated}).
-\end{itemize}
+\begin{card}
+    \begin{itemize}
+        \item 3 serveurs Nginx sur 3 nœuds Grid5000, 1 worker par serveur, 1 cœur logique.
+        \item Front-end et serveur intermédiaire : 2 proxies ; back-end : serveur HTTP.
+        \item Proxy buffering désactivé.
+        \item Charge : 50 clients/s jusqu'à 1000 clients, ~30k requêtes GET.
+        \item Payloads virtuelles : \{16, 32, 64, 128, 256 Ko\}.
+        \item Métriques : CPU total, CPU sur cœur du worker, mémoire, latence et débit.
+        \item Variables : alignement des buffers, stratégie ODB (\textit{dynamic} vs \textit{anticipated}).
+    \end{itemize}
+\end{card}
 \end{frame}
 
 \begin{frame}{ODB : Stratégies d'envoi (non-aligné)}
@@ -397,9 +440,10 @@ KrakOS bénéficie d’un environnement scientifique riche, avec des collaborati
 
 \section{Problème de téléchargement indisponible}
 \begin{frame}{Problème : téléchargement indisponible}
+\begin{card}
 \begin{itemize}
     \item Payload virtuelle : téléchargement depuis BE uniquement à la demande.
-    \item Problème : BE inaccessible → SIGSEGV ou données corrompues.
+    \item Problème : BE inaccessible lors de la demande.
     \item Solutions envisagées :
     \begin{enumerate}
         \item Arrêt du processus
@@ -408,50 +452,62 @@ KrakOS bénéficie d’un environnement scientifique riche, avec des collaborati
         \item Best-effort (retransmission si possible)
     \end{enumerate}
 \end{itemize}
-\begin{figure}
-    \includegraphics[width=\textwidth]{img2/odb_c_best_effort.jpg}
-\end{figure}
+\end{card}
+\end{frame}
+
+\begin{frame}{Problème : téléchargement indisponible Illustration}
+    \begin{figure}
+        \centering
+        \includegraphics[width=\textwidth]{img2/odb_c_best_effort.jpg}
+        \caption{Problème de téléchargement indisponible}
+    \end{figure}
 \end{frame}
 
 \section{Problème d'utilisation mémoire pour les buffers virtuels}
 \begin{frame}{Problème : utilisation mémoire pour buffers virtuels}
-\begin{itemize}
-    \item Chaque payload virtuelle allouée en mémoire du BE.
-    \item Plus de requêtes → plus de mémoire utilisée.
-    \item Solution : ramasse-miettes :
+\begin{card}
     \begin{itemize}
-        \item Supprime payloads virtuelles utilisées
-        \item Thread dédié supprime payloads non utilisées après un délai configurable
+        \item Chaque payload virtuelle allouée en mémoire du BE.
+        \item Plus de requêtes → plus de mémoire utilisée.
+        \item Solution : ramasse-miettes :
+        \begin{itemize}
+            \item Supprime payloads virtuelles utilisées
+            \item Thread dédié supprime payloads non utilisées après un délai configurable
+        \end{itemize}
     \end{itemize}
-\end{itemize}
+\end{card}
 \end{frame}
 
 
 \part{Conclusion}
 \begin{frame}{Conclusion et perspectives (1/2)}
-\begin{itemize}
-    \item \textbf{ODB} : idée originale et prometteuse pour réduire l'envoi de données redondantes.
-    \item Réduction potentielle de la charge CPU, consommation réseau et énergétique.
-    \item Limites observées :
+\begin{card}
     \begin{itemize}
-        \item Surcoût CPU et latence liés à l'utilisation de \textit{mprotect}.
-        \item Augmentation de la latence globale par rapport à vanilla, réduisant la QoS.
-        \item Charge transférée du serveur intermédiaire vers le Back-End et Front-End.
+        \item \textbf{ODB} : idée originale et prometteuse pour réduire l'envoi de données redondantes.
+        \item Réduction potentielle de la charge CPU, consommation réseau et énergétique.
+        \item Limites observées :
+        \begin{itemize}
+            \item Surcoût CPU et latence liés à l'utilisation de \textit{mprotect}.
+            \item Augmentation de la latence globale par rapport à vanilla, réduisant la QoS.
+            \item Charge transférée du serveur intermédiaire vers le Back-End et Front-End.
+        \end{itemize}
+        \item Protocole pertinent pour un usage plus écologique et plus respectueux de l’environnement.
     \end{itemize}
-    \item Protocole pertinent pour un usage plus écologique et plus respectueux de l’environnement.
-\end{itemize}
+\end{card}
 \end{frame}
 
 \begin{frame}{Conclusion et perspectives (2/2)}
-\begin{itemize}
-    \item \textbf{Pistes d’amélioration :}
+\begin{card}
     \begin{itemize}
-        \item Explorer l’utilisation de \textit{userfaultfd} pour remplacer \textit{mprotect}.
-        \item Étudier l’intégration de sockets non-bloquantes pour exploiter la boucle d’événements de nginx.
-        \item Développer une API dédiée pour limiter les détournements de fonctions \textit{libc} et améliorer les performances.
+        \item \textbf{Pistes d’amélioration :}
+        \begin{itemize}
+            \item Explorer l’utilisation de \textit{userfaultfd} pour remplacer \textit{mprotect}.
+            \item Étudier l’intégration de sockets non-bloquantes pour exploiter la boucle d’événements de nginx.
+            \item Développer une API dédiée pour limiter les détournements de fonctions \textit{libc} et améliorer les performances.
+        \end{itemize}
+        \item Ces axes pourraient réduire les impacts des limitations actuelles et améliorer la portabilité et l’efficacité d'ODB.
     \end{itemize}
-    \item Ces axes pourraient réduire les impacts des limitations actuelles et améliorer la portabilité et l’efficacité d'ODB.
-\end{itemize}
+\end{card}
 \end{frame}
 
 
